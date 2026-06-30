@@ -57,7 +57,7 @@ function render() {
 }
 
 function renderHeader() {
-  document.getElementById('companyName').textContent = (STATE.company?.name || '境宇設計').split(' ')[0];
+  document.getElementById('companyName').textContent = (STATE.company?.name || '墨點').split(' ')[0];
   document.getElementById('projectIdShort').textContent = STATE.projectId || '—';
   document.getElementById('projectName').textContent = STATE.projectName || '（尚未設定）';
   document.getElementById('clientName').textContent = STATE.clientName || '—';
@@ -227,7 +227,7 @@ function openInvoice(clientPaymentId) {
     <div class="invoice">
       <div class="invoice-header">
         <div>
-          <h2>${company.name || '境宇設計'}</h2>
+          <h2>${company.name || '墨點'}</h2>
           <p>${company.address || ''}</p>
           <p>統編：${company.taxId || '—'} ｜ 電話：${company.phone || '—'}</p>
         </div>
