@@ -48,12 +48,16 @@ async function loadProject() {
   }
 }
 
+const STATUS_STAGES = ['規劃中', '施工中', '驗收中', '已完工'];
+
 function render() {
   if (!STATE) return;
   renderHeader();
   renderDashboard();
+  renderHTimeline();
   renderClientTimeline();
   renderVendorGrid();
+  renderAdvanceButton();
 }
 
 function renderHeader() {
@@ -77,6 +81,7 @@ function renderDashboard() {
   document.getElementById('statCost').textContent = fmt(cost);
   document.getElementById('statProfitRate').textContent = profitRate.toFixed(1) + '%';
   document.getElementById('statProfitAmount').textContent = fmt(profit);
+  document.getElementById('statAddOns').textContent = STATE.totalAddOns ? fmt(STATE.totalAddOns) : '—';
 
   document.getElementById('barCost').style.width = costPct + '%';
   document.getElementById('barProfit').style.width = profitPct + '%';
@@ -90,6 +95,52 @@ function renderDashboard() {
   document.getElementById('collectedFill').style.width = (revenue ? Math.min(100, collected / revenue * 100) : 0) + '%';
   document.getElementById('paidAmount').textContent = `${fmt(paid)} / ${fmt(cost)}`;
   document.getElementById('paidFill').style.width = (cost ? Math.min(100, paid / cost * 100) : 0) + '%';
+
+  document.getElementById('netCollected').textContent = fmt(collected);
+  document.getElementById('netPaid').textContent = fmt(paid);
+  document.getElementById('netCashflow').textContent = fmt(collected - paid);
+}
+
+function renderHTimeline() {
+  const wrap = document.getElementById('hTimeline');
+  wrap.innerHTML = '';
+  const payments = STATE.clientPayments || [];
+  const firstUnpaidIdx = payments.findIndex(p => p.status !== '已收');
+  payments.forEach((p, idx) => {
+    const isDone = p.status === '已收';
+    const isCurrent = !isDone && idx === firstUnpaidIdx;
+    const step = document.createElement('div');
+    step.className = 'h-step' + (isDone ? ' is-done' : '') + (isCurrent ? ' is-current' : '');
+    step.innerHTML = `
+      <div class="h-step__line"></div>
+      <div class="h-step__dot">${isDone ? '✓' : ''}</div>
+      <div class="h-step__label">${p.stageName}</div>
+      <div class="h-step__date">${p.expectedDate || '—'}</div>
+      <div class="h-step__amount">${fmt(p.amount)}</div>
+    `;
+    wrap.appendChild(step);
+  });
+  if (!payments.length) {
+    wrap.innerHTML = '<p class="panel-hint">尚無請款階段。</p>';
+  }
+}
+
+function renderAdvanceButton() {
+  const btn = document.getElementById('btnAdvanceStatus');
+  const label = document.getElementById('nextStatusLabel');
+  const idx = STATUS_STAGES.indexOf(STATE.status);
+  const next = idx >= 0 && idx < STATUS_STAGES.length - 1 ? STATUS_STAGES[idx + 1] : null;
+  if (!next) {
+    btn.disabled = true;
+    label.textContent = STATE.status === STATUS_STAGES[STATUS_STAGES.length - 1] ? '已完工' : '—';
+    btn.style.opacity = '0.5';
+    btn.style.cursor = 'default';
+  } else {
+    btn.disabled = false;
+    label.textContent = next;
+    btn.style.opacity = '1';
+    btn.style.cursor = 'pointer';
+  }
 }
 
 function renderClientTimeline() {
@@ -154,15 +205,7 @@ function renderVendorGrid() {
   }
 }
 
-// ===== Tabs =====
-document.querySelectorAll('.tab-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('is-active'));
-    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('is-active'));
-    btn.classList.add('is-active');
-    document.getElementById('panel-' + btn.dataset.tab).classList.add('is-active');
-  });
-});
+// (已改為單頁整合呈現，不再需要 Tab 切換)
 
 // ===== Event delegation for dynamic buttons =====
 document.addEventListener('click', async (e) => {
@@ -207,16 +250,45 @@ document.getElementById('btnAddClientStage').addEventListener('click', openClien
 document.getElementById('btnAddVendor').addEventListener('click', openVendorForm);
 document.getElementById('btnSettings').addEventListener('click', openSettingsForm);
 
+document.getElementById('btnAdvanceStatus').addEventListener('click', async () => {
+  const idx = STATUS_STAGES.indexOf(STATE.status);
+  const next = idx >= 0 && idx < STATUS_STAGES.length - 1 ? STATUS_STAGES[idx + 1] : null;
+  if (!next) return;
+  if (!confirm(`確定要把專案狀態推進至「${next}」嗎？`)) return;
+  try {
+    STATE = await callScript('updateProject', { status: next });
+    render();
+  } catch (err) {
+    alert('操作失敗：' + err.message);
+  }
+});
+
+document.getElementById('btnDeleteProject').addEventListener('click', async () => {
+  const typed = prompt(`此動作會刪除整個專案的所有資料，且無法復原。\n請輸入專案名稱「${STATE.projectName}」以確認刪除：`);
+  if (typed !== STATE.projectName) {
+    if (typed !== null) alert('輸入的專案名稱不符，已取消刪除。');
+    return;
+  }
+  try {
+    STATE = await callScript('deleteProject');
+    render();
+    alert('專案資料已清除。');
+  } catch (err) {
+    alert('刪除失敗：' + err.message);
+  }
+});
+
 // ===== Invoice Modal =====
 function openInvoice(clientPaymentId) {
   const item = STATE.clientPayments.find(p => p.id === clientPaymentId);
   const totalRevenue = STATE.totalRevenue || 0;
   const collected = STATE.clientPayments.filter(p => p.status === '已收').reduce((s,p)=>s+p.amount,0);
   const company = STATE.company || {};
+  const pctOfTotal = totalRevenue ? (item.amount / totalRevenue * 100).toFixed(0) : 0;
 
   const rowsHtml = STATE.clientPayments.map(p => `
-    <tr>
-      <td>${p.stageName}</td>
+    <tr class="${p.id === item.id ? 'is-current-row' : ''}">
+      <td>${p.stageName}${p.id === item.id ? ' <span class="tag-current">本期</span>' : ''}</td>
       <td>${fmt(p.amount)}</td>
       <td>${p.expectedDate || '—'}</td>
       <td>${p.status}</td>
@@ -227,13 +299,14 @@ function openInvoice(clientPaymentId) {
     <div class="invoice">
       <div class="invoice-header">
         <div>
-          <h2>${company.name || '墨點'}</h2>
+          <h2>${company.name || '墨點 MOTAN'}</h2>
           <p>${company.address || ''}</p>
           <p>統編：${company.taxId || '—'} ｜ 電話：${company.phone || '—'}</p>
         </div>
         <div class="invoice-meta">
-          <div>請款單號：${item.invoiceNo || '—'}</div>
-          <div>開立日期：${new Date().toISOString().slice(0,10)}</div>
+          <div class="invoice-tag">請款單</div>
+          <div>單號：${item.invoiceNo || '—'}</div>
+          <div>開立：${new Date().toISOString().slice(0,10)}</div>
         </div>
       </div>
 
@@ -242,7 +315,8 @@ function openInvoice(clientPaymentId) {
       <div class="invoice-row"><span>專案名稱</span><span>${STATE.projectName}</span></div>
 
       <div class="invoice-section-title">本期請款項目</div>
-      <div class="invoice-row"><span>${item.stageName}</span><span class="mono">${fmt(item.amount)}</span></div>
+      <div class="invoice-row"><span>${item.stageName} <span class="tag-current">本期</span></span><span class="mono">${fmt(item.amount)}</span></div>
+      <div class="invoice-row" style="border-bottom:none;color:var(--ink-soft);font-size:11px;">合約總額 ${fmt(totalRevenue)} 之 ${pctOfTotal}%</div>
       <div class="invoice-row total"><span>本期應付總額</span><span class="mono">${fmt(item.amount)}</span></div>
 
       <div class="invoice-section-title">各期進度總覽</div>
@@ -366,7 +440,8 @@ function openSettingsForm() {
       <p class="panel-hint" style="margin-bottom:14px;">若 Sheet 裡還沒有專案資料，可一併填寫以下欄位建立第一筆專案（已有資料的話可留空）。</p>
       <div class="form-field"><label>業主姓名</label><input name="clientName" placeholder="例：李先生"></div>
       <div class="form-field"><label>專案名稱</label><input name="projectName" placeholder="例：高雄-自由路 李宅"></div>
-      <div class="form-field"><label>業主報價總額</label><input name="totalRevenue" type="number" min="0"></div>
+      <div class="form-field"><label>業主報價總額</label><input name="totalRevenue" type="number" min="0" value="${STATE?.totalRevenue || ''}"></div>
+      <div class="form-field"><label>業主追加（含利潤）</label><input name="totalAddOns" type="number" min="0" value="${STATE?.totalAddOns || ''}" placeholder="若無追加項目可留空"></div>
       <div class="modal-actions">
         <button type="button" class="btn btn--ghost" data-form-cancel>取消</button>
         <button type="submit" class="btn btn--primary">儲存並連接</button>
@@ -383,8 +458,17 @@ function openSettingsForm() {
         projectName: fd.get('projectName') || '',
         totalRevenue: fd.get('totalRevenue') || 0
       });
+      if (fd.get('totalAddOns')) {
+        STATE = await callScript('updateProject', { totalAddOns: fd.get('totalAddOns') });
+      }
     } else {
       STATE = await callScript('getData');
+      const updates = {};
+      if (fd.get('totalRevenue')) updates.totalRevenue = fd.get('totalRevenue');
+      if (fd.get('totalAddOns')) updates.totalAddOns = fd.get('totalAddOns');
+      if (Object.keys(updates).length) {
+        STATE = await callScript('updateProject', updates);
+      }
     }
     hideBanner();
     render();
