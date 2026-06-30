@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>境宇設計 ｜ 專案帳務管理</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700;900&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="app">
+
+  <!-- 頂部列：帳本封面 -->
+  <header class="ledger-header">
+    <div class="ledger-header__brand">
+      <span class="brand-mark">境</span>
+      <div class="brand-text">
+        <h1 id="companyName">境宇設計</h1>
+        <p>Jing Yu Design ｜ 專案帳務帳本</p>
+      </div>
+    </div>
+    <div class="ledger-header__actions">
+      <button class="btn btn--ghost" id="btnSettings">連接設定</button>
+      <button class="btn btn--ghost" id="btnExport">匯出帳本</button>
+      <label class="btn btn--ghost" for="importFile">匯入帳本</label>
+      <input type="file" id="importFile" accept="application/json" hidden>
+    </div>
+  </header>
+
+  <main class="ledger-body">
+    <div class="connection-banner" id="connectionBanner" style="display:none;"></div>
+
+    <!-- 專案基本資訊 -->
+    <section class="project-card">
+      <div class="project-card__main">
+        <p class="eyebrow">PROJECT FILE NO. <span id="projectIdShort">—</span></p>
+        <h2 id="projectName">—</h2>
+        <div class="meta-row">
+          <span>業主：<strong id="clientName">—</strong></span>
+          <span class="divider-dot">·</span>
+          <span>狀態：<strong id="projectStatus" class="status-tag">—</strong></span>
+          <span class="divider-dot">·</span>
+          <span>預計完工：<strong id="endDate">—</strong></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 財務儀表板（固定區） -->
+    <section class="dashboard">
+      <div class="dashboard__stats">
+        <div class="stat-block stat-block--revenue">
+          <span class="stat-label">業主報價</span>
+          <span class="stat-value" id="statRevenue">NT$ 0</span>
+        </div>
+        <div class="stat-block stat-block--cost">
+          <span class="stat-label">廠商成本</span>
+          <span class="stat-value" id="statCost">NT$ 0</span>
+        </div>
+        <div class="stat-block stat-block--profit">
+          <span class="stat-label">最終利潤率</span>
+          <span class="stat-value" id="statProfitRate">0%</span>
+          <span class="stat-sub" id="statProfitAmount">NT$ 0</span>
+        </div>
+      </div>
+
+      <div class="ledger-bar-wrap">
+        <div class="ledger-bar">
+          <div class="ledger-bar__cost" id="barCost"></div>
+          <div class="ledger-bar__profit" id="barProfit"></div>
+        </div>
+        <div class="ledger-bar__legend">
+          <span><i class="dot dot--cost"></i>成本佔比 <b id="legendCostPct">0%</b></span>
+          <span><i class="dot dot--profit"></i>利潤佔比 <b id="legendProfitPct">0%</b></span>
+        </div>
+      </div>
+
+      <div class="dashboard__collect">
+        <div class="collect-row">
+          <span>業主已收款</span>
+          <span class="mono" id="collectedAmount">NT$ 0 / NT$ 0</span>
+        </div>
+        <div class="mini-bar"><div class="mini-bar__fill" id="collectedFill"></div></div>
+        <div class="collect-row">
+          <span>廠商已付款</span>
+          <span class="mono" id="paidAmount">NT$ 0 / NT$ 0</span>
+        </div>
+        <div class="mini-bar"><div class="mini-bar__fill mini-bar__fill--vendor" id="paidFill"></div></div>
+      </div>
+    </section>
+
+    <!-- Tabs -->
+    <section class="tabs-section">
+      <div class="tabs-nav">
+        <button class="tab-btn is-active" data-tab="client">業主請款計畫</button>
+        <button class="tab-btn" data-tab="vendor">廠商進度請款</button>
+      </div>
+
+      <!-- 業主請款計畫 -->
+      <div class="tab-panel is-active" id="panel-client">
+        <div class="panel-toolbar">
+          <p class="panel-hint">按時間軸排列各期請款節點，點擊狀態可切換已收／待收。</p>
+          <button class="btn btn--primary btn--sm" id="btnAddClientStage">＋ 新增請款階段</button>
+        </div>
+        <div class="timeline" id="clientTimeline"></div>
+      </div>
+
+      <!-- 廠商進度請款 -->
+      <div class="tab-panel" id="panel-vendor">
+        <div class="panel-toolbar">
+          <p class="panel-hint">各發包廠商之合約金額與已付款進度。</p>
+          <button class="btn btn--primary btn--sm" id="btnAddVendor">＋ 新增廠商</button>
+        </div>
+        <div class="vendor-grid" id="vendorGrid"></div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- 請款單 Modal -->
+<div class="modal-overlay" id="invoiceOverlay">
+  <div class="modal-sheet" id="invoiceSheet">
+    <button class="modal-close" id="btnCloseInvoice">✕</button>
+    <div id="invoicePrintArea"></div>
+    <div class="modal-actions">
+      <button class="btn btn--ghost" id="btnCloseInvoice2">關閉</button>
+      <button class="btn btn--primary" id="btnPrintInvoice">列印 / 另存 PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- 通用輸入 Modal -->
+<div class="modal-overlay" id="formOverlay">
+  <div class="modal-sheet modal-sheet--form" id="formSheet"></div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
