@@ -186,6 +186,22 @@ body{
 }
 .connection-banner.is-error{background:var(--clay-soft);border-color:var(--clay);}
 
+/* ===== Project list (multi-project) ===== */
+.project-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;}
+.project-tile{
+  background:var(--paper-card);border:1px solid var(--rule);border-radius:var(--radius);
+  padding:18px 20px;cursor:pointer;box-shadow:var(--shadow);transition:transform .12s ease;
+  display:flex;flex-direction:column;gap:10px;
+}
+.project-tile:hover{transform:translateY(-2px);}
+.project-tile__top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
+.project-tile__name{font-family:var(--serif);font-size:16px;font-weight:700;}
+.project-tile__client{font-size:12px;color:var(--ink-soft);margin-top:2px;}
+.project-tile__nums{display:flex;justify-content:space-between;font-size:12px;color:var(--ink-soft);font-family:var(--mono);}
+.project-tile__bar{height:6px;border-radius:3px;background:var(--rule);overflow:hidden;}
+.project-tile__bar-fill{height:100%;background:var(--pine);}
+.project-tile__end{font-size:11px;color:var(--ink-soft);}
+
 /* ===== Section head (shared by timeline & vendor sections) ===== */
 .section-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
 .section-head h3{font-family:var(--serif);font-size:17px;margin:0;}

@@ -32,104 +32,118 @@
   <main class="ledger-body">
     <div class="connection-banner" id="connectionBanner" style="display:none;"></div>
 
-    <!-- 專案基本資訊 -->
-    <section class="project-card">
-      <div class="project-card__main">
-        <p class="eyebrow">PROJECT FILE NO. <span id="projectIdShort">—</span></p>
-        <h2 id="projectName">—</h2>
-        <div class="meta-row">
-          <span>業主：<strong id="clientName">—</strong></span>
-          <span class="divider-dot">·</span>
-          <span>狀態：<strong id="projectStatus" class="status-tag">—</strong></span>
-          <span class="divider-dot">·</span>
-          <span>預計完工：<strong id="endDate">—</strong></span>
-        </div>
-      </div>
-    </section>
-
-    <!-- 財務儀表板（固定區） -->
-    <section class="dashboard">
-      <div class="dashboard__stats dashboard__stats--four">
-        <div class="stat-block stat-block--revenue">
-          <span class="stat-label">業主報價</span>
-          <span class="stat-value" id="statRevenue">NT$ 0</span>
-        </div>
-        <div class="stat-block stat-block--cost">
-          <span class="stat-label">廠商成本</span>
-          <span class="stat-value" id="statCost">NT$ 0</span>
-        </div>
-        <div class="stat-block stat-block--addon">
-          <span class="stat-label">業主追加（含利潤）</span>
-          <span class="stat-value" id="statAddOns">—</span>
-        </div>
-        <div class="stat-block stat-block--profit">
-          <span class="stat-label">最終利潤率</span>
-          <span class="stat-value" id="statProfitRate">0%</span>
-          <span class="stat-sub" id="statProfitAmount">NT$ 0</span>
-        </div>
-      </div>
-
-      <div class="ledger-bar-wrap">
-        <div class="ledger-bar">
-          <div class="ledger-bar__cost" id="barCost"></div>
-          <div class="ledger-bar__profit" id="barProfit"></div>
-        </div>
-        <div class="ledger-bar__legend">
-          <span><i class="dot dot--cost"></i>成本佔比 <b id="legendCostPct">0%</b></span>
-          <span><i class="dot dot--profit"></i>利潤佔比 <b id="legendProfitPct">0%</b></span>
-        </div>
-      </div>
-
-      <div class="dashboard__collect">
-        <div class="collect-row">
-          <span>業主已收款</span>
-          <span class="mono" id="collectedAmount">NT$ 0 / NT$ 0</span>
-        </div>
-        <div class="mini-bar"><div class="mini-bar__fill" id="collectedFill"></div></div>
-        <div class="collect-row">
-          <span>廠商已付款</span>
-          <span class="mono" id="paidAmount">NT$ 0 / NT$ 0</span>
-        </div>
-        <div class="mini-bar"><div class="mini-bar__fill mini-bar__fill--vendor" id="paidFill"></div></div>
-      </div>
-
-      <div class="net-cashflow-row">
-        <div class="net-cashflow-item"><span>業主已收款</span><b id="netCollected" class="mono">NT$ 0</b></div>
-        <div class="net-cashflow-item"><span>廠商已付款</span><b id="netPaid" class="mono">NT$ 0</b></div>
-        <div class="net-cashflow-item net-cashflow-item--highlight"><span>淨現金流</span><b id="netCashflow" class="mono">NT$ 0</b></div>
-      </div>
-    </section>
-
-    <!-- 業主請款進度：水平時間軸 -->
-    <section class="timeline-section">
+    <!-- ===== 專案列表畫面 ===== -->
+    <div id="listView">
       <div class="section-head">
-        <h3>業主請款計畫</h3>
-        <button class="btn btn--primary btn--sm" id="btnAddClientStage">＋ 新增請款階段</button>
+        <h3>專案總覽</h3>
+        <button class="btn btn--primary btn--sm" id="btnNewProject">＋ 新增專案</button>
       </div>
-      <div class="h-timeline" id="hTimeline"></div>
-      <div class="timeline" id="clientTimeline"></div>
-    </section>
+      <div class="project-grid" id="projectGrid"></div>
+    </div>
 
-    <!-- 廠商進度請款 -->
-    <section class="vendor-section">
-      <div class="section-head">
-        <h3>廠商進度請款</h3>
-        <button class="btn btn--primary btn--sm" id="btnAddVendor">＋ 新增廠商</button>
-      </div>
-      <div class="vendor-grid" id="vendorGrid"></div>
-    </section>
+    <!-- ===== 專案詳情畫面 ===== -->
+    <div id="detailView" style="display:none;">
+      <button class="btn btn--ghost btn--sm" id="btnBackToList" style="margin-bottom:14px;">← 返回專案列表</button>
 
-    <!-- 專案狀態推進 -->
-    <section class="advance-section">
-      <button class="btn btn--advance" id="btnAdvanceStatus">推進至「<span id="nextStatusLabel">—</span>」 →</button>
-    </section>
+      <!-- 專案基本資訊 -->
+      <section class="project-card">
+        <div class="project-card__main">
+          <p class="eyebrow">PROJECT FILE NO. <span id="projectIdShort">—</span></p>
+          <h2 id="projectName">—</h2>
+          <div class="meta-row">
+            <span>業主：<strong id="clientName">—</strong></span>
+            <span class="divider-dot">·</span>
+            <span>狀態：<strong id="projectStatus" class="status-tag">—</strong></span>
+            <span class="divider-dot">·</span>
+            <span>預計完工：<strong id="endDate">—</strong></span>
+          </div>
+        </div>
+      </section>
 
-    <!-- 危險操作區 -->
-    <section class="danger-zone">
-      <h4>⚠ 危險操作區</h4>
-      <p>刪除專案將一併移除：所有請款階段、廠商合約、廠商請款紀錄。此動作無法復原。</p>
-      <button class="btn btn--danger-zone" id="btnDeleteProject">刪除此專案</button>
-    </section>
+      <!-- 財務儀表板 -->
+      <section class="dashboard">
+        <div class="dashboard__stats dashboard__stats--four">
+          <div class="stat-block stat-block--revenue">
+            <span class="stat-label">業主報價</span>
+            <span class="stat-value" id="statRevenue">NT$ 0</span>
+          </div>
+          <div class="stat-block stat-block--cost">
+            <span class="stat-label">廠商成本</span>
+            <span class="stat-value" id="statCost">NT$ 0</span>
+          </div>
+          <div class="stat-block stat-block--addon">
+            <span class="stat-label">業主追加（含利潤）</span>
+            <span class="stat-value" id="statAddOns">—</span>
+          </div>
+          <div class="stat-block stat-block--profit">
+            <span class="stat-label">最終利潤率</span>
+            <span class="stat-value" id="statProfitRate">0%</span>
+            <span class="stat-sub" id="statProfitAmount">NT$ 0</span>
+          </div>
+        </div>
+
+        <div class="ledger-bar-wrap">
+          <div class="ledger-bar">
+            <div class="ledger-bar__cost" id="barCost"></div>
+            <div class="ledger-bar__profit" id="barProfit"></div>
+          </div>
+          <div class="ledger-bar__legend">
+            <span><i class="dot dot--cost"></i>成本佔比 <b id="legendCostPct">0%</b></span>
+            <span><i class="dot dot--profit"></i>利潤佔比 <b id="legendProfitPct">0%</b></span>
+          </div>
+        </div>
+
+        <div class="dashboard__collect">
+          <div class="collect-row">
+            <span>業主已收款</span>
+            <span class="mono" id="collectedAmount">NT$ 0 / NT$ 0</span>
+          </div>
+          <div class="mini-bar"><div class="mini-bar__fill" id="collectedFill"></div></div>
+          <div class="collect-row">
+            <span>廠商已付款</span>
+            <span class="mono" id="paidAmount">NT$ 0 / NT$ 0</span>
+          </div>
+          <div class="mini-bar"><div class="mini-bar__fill mini-bar__fill--vendor" id="paidFill"></div></div>
+        </div>
+
+        <div class="net-cashflow-row">
+          <div class="net-cashflow-item"><span>業主已收款</span><b id="netCollected" class="mono">NT$ 0</b></div>
+          <div class="net-cashflow-item"><span>廠商已付款</span><b id="netPaid" class="mono">NT$ 0</b></div>
+          <div class="net-cashflow-item net-cashflow-item--highlight"><span>淨現金流</span><b id="netCashflow" class="mono">NT$ 0</b></div>
+        </div>
+      </section>
+
+      <!-- 業主請款進度：水平時間軸 -->
+      <section class="timeline-section">
+        <div class="section-head">
+          <h3>業主請款計畫</h3>
+          <button class="btn btn--primary btn--sm" id="btnAddClientStage">＋ 新增請款階段</button>
+        </div>
+        <div class="h-timeline" id="hTimeline"></div>
+        <div class="timeline" id="clientTimeline"></div>
+      </section>
+
+      <!-- 廠商進度請款 -->
+      <section class="vendor-section">
+        <div class="section-head">
+          <h3>廠商進度請款</h3>
+          <button class="btn btn--primary btn--sm" id="btnAddVendor">＋ 新增廠商</button>
+        </div>
+        <div class="vendor-grid" id="vendorGrid"></div>
+      </section>
+
+      <!-- 專案狀態推進 -->
+      <section class="advance-section">
+        <button class="btn btn--advance" id="btnAdvanceStatus">推進至「<span id="nextStatusLabel">—</span>」 →</button>
+      </section>
+
+      <!-- 危險操作區 -->
+      <section class="danger-zone">
+        <h4>⚠ 危險操作區</h4>
+        <p>刪除專案將一併移除：所有請款階段、廠商合約、廠商請款紀錄。此動作無法復原。</p>
+        <button class="btn btn--danger-zone" id="btnDeleteProject">刪除此專案</button>
+      </section>
+    </div>
 
   </main>
 </div>

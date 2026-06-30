@@ -1,7 +1,10 @@
-let STATE = null;
+let STATE = null;          // 目前開啟的單一專案完整資料
+let PROJECT_LIST = [];     // 專案列表摘要
+let CURRENT_PROJECT_ID = null;
 let SCRIPT_URL = localStorage.getItem('jy_script_url') || '';
 
 const fmt = n => 'NT$ ' + Math.round(n || 0).toLocaleString('zh-TW');
+const STATUS_STAGES = ['規劃中', '施工中', '驗收中', '已完工'];
 
 function buildUrl(action, params = {}) {
   const url = new URL(SCRIPT_URL);
@@ -33,23 +36,77 @@ function hideBanner() {
   document.getElementById('connectionBanner').style.display = 'none';
 }
 
-async function loadProject() {
+// ===== 畫面切換：專案列表 / 專案詳情 =====
+function showListView() {
+  CURRENT_PROJECT_ID = null;
+  STATE = null;
+  document.getElementById('listView').style.display = 'block';
+  document.getElementById('detailView').style.display = 'none';
+  loadProjectList();
+}
+function showDetailView() {
+  document.getElementById('listView').style.display = 'none';
+  document.getElementById('detailView').style.display = 'block';
+}
+
+async function loadProjectList() {
   if (!SCRIPT_URL) { showBanner('尚未連接 Google Apps Script，請點右上角「連接設定」貼上你的 /exec 網址。', true); return; }
   try {
-    STATE = await callScript('getData');
-    if (!STATE.projectId) {
-      showBanner('已連接成功，但 Sheet 裡還沒有專案資料，請點「連接設定」建立第一筆專案資訊。');
-    } else {
-      hideBanner();
-    }
-    render();
+    const data = await callScript('getProjectList');
+    PROJECT_LIST = data.projects || [];
+    hideBanner();
+    renderProjectGrid();
   } catch (err) {
     showBanner('連接失敗：' + err.message + '（請確認網址是否正確、部署存取權是否為「任何人」）', true);
   }
 }
 
-const STATUS_STAGES = ['規劃中', '施工中', '驗收中', '已完工'];
+function renderProjectGrid() {
+  const wrap = document.getElementById('projectGrid');
+  wrap.innerHTML = '';
+  if (!PROJECT_LIST.length) {
+    wrap.innerHTML = '<p class="panel-hint">尚無任何專案，點右上角「＋ 新增專案」建立第一個案子。</p>';
+    return;
+  }
+  PROJECT_LIST.forEach(p => {
+    const pct = p.totalRevenue ? Math.min(100, p.collected / p.totalRevenue * 100) : 0;
+    const tile = document.createElement('div');
+    tile.className = 'project-tile';
+    tile.innerHTML = `
+      <div class="project-tile__top">
+        <div>
+          <div class="project-tile__name">${p.projectName || '（未命名專案）'}</div>
+          <div class="project-tile__client">業主：${p.clientName || '—'}</div>
+        </div>
+        <span class="status-tag">${p.status || '—'}</span>
+      </div>
+      <div class="project-tile__nums">
+        <span>已收 ${fmt(p.collected)}</span>
+        <span>報價 ${fmt(p.totalRevenue)}</span>
+      </div>
+      <div class="project-tile__bar"><div class="project-tile__bar-fill" style="width:${pct}%"></div></div>
+      <div class="project-tile__end">預計完工：${p.endDate || '—'}</div>
+    `;
+    tile.addEventListener('click', () => openProject(p.projectId));
+    wrap.appendChild(tile);
+  });
+}
 
+async function openProject(projectId) {
+  CURRENT_PROJECT_ID = projectId;
+  try {
+    STATE = await callScript('getData', { projectId });
+    showDetailView();
+    render();
+  } catch (err) {
+    alert('開啟專案失敗：' + err.message);
+  }
+}
+
+document.getElementById('btnBackToList').addEventListener('click', showListView);
+document.getElementById('btnNewProject').addEventListener('click', openNewProjectForm);
+
+// ===== 詳情頁渲染 =====
 function render() {
   if (!STATE) return;
   renderHeader();
@@ -61,7 +118,6 @@ function render() {
 }
 
 function renderHeader() {
-  document.getElementById('companyName').textContent = (STATE.company?.name || '墨點').split(' ')[0];
   document.getElementById('projectIdShort').textContent = STATE.projectId || '—';
   document.getElementById('projectName').textContent = STATE.projectName || '（尚未設定）';
   document.getElementById('clientName').textContent = STATE.clientName || '—';
@@ -122,24 +178,6 @@ function renderHTimeline() {
   });
   if (!payments.length) {
     wrap.innerHTML = '<p class="panel-hint">尚無請款階段。</p>';
-  }
-}
-
-function renderAdvanceButton() {
-  const btn = document.getElementById('btnAdvanceStatus');
-  const label = document.getElementById('nextStatusLabel');
-  const idx = STATUS_STAGES.indexOf(STATE.status);
-  const next = idx >= 0 && idx < STATUS_STAGES.length - 1 ? STATUS_STAGES[idx + 1] : null;
-  if (!next) {
-    btn.disabled = true;
-    label.textContent = STATE.status === STATUS_STAGES[STATUS_STAGES.length - 1] ? '已完工' : '—';
-    btn.style.opacity = '0.5';
-    btn.style.cursor = 'default';
-  } else {
-    btn.disabled = false;
-    label.textContent = next;
-    btn.style.opacity = '1';
-    btn.style.cursor = 'pointer';
   }
 }
 
@@ -205,9 +243,25 @@ function renderVendorGrid() {
   }
 }
 
-// (已改為單頁整合呈現，不再需要 Tab 切換)
+function renderAdvanceButton() {
+  const btn = document.getElementById('btnAdvanceStatus');
+  const label = document.getElementById('nextStatusLabel');
+  const idx = STATUS_STAGES.indexOf(STATE.status);
+  const next = idx >= 0 && idx < STATUS_STAGES.length - 1 ? STATUS_STAGES[idx + 1] : null;
+  if (!next) {
+    btn.disabled = true;
+    label.textContent = STATE.status === STATUS_STAGES[STATUS_STAGES.length - 1] ? '已完工' : '—';
+    btn.style.opacity = '0.5';
+    btn.style.cursor = 'default';
+  } else {
+    btn.disabled = false;
+    label.textContent = next;
+    btn.style.opacity = '1';
+    btn.style.cursor = 'pointer';
+  }
+}
 
-// ===== Event delegation for dynamic buttons =====
+// ===== Event delegation for dynamic buttons（詳情頁內） =====
 document.addEventListener('click', async (e) => {
   const btn = e.target.closest('[data-action]');
   if (!btn) return;
@@ -218,7 +272,7 @@ document.addEventListener('click', async (e) => {
     if (action === 'toggle-status') {
       const item = STATE.clientPayments.find(p => p.id === id);
       const newStatus = item.status === '已收' ? '待收' : '已收';
-      STATE = await callScript('toggleClientStatus', { id, status: newStatus });
+      STATE = await callScript('toggleClientStatus', { id, status: newStatus, projectId: CURRENT_PROJECT_ID });
       render();
     }
 
@@ -228,13 +282,13 @@ document.addEventListener('click', async (e) => {
 
     if (action === 'delete-client-stage') {
       if (!confirm('確定要刪除此請款階段嗎？')) return;
-      STATE = await callScript('deleteClientStage', { id });
+      STATE = await callScript('deleteClientStage', { id, projectId: CURRENT_PROJECT_ID });
       render();
     }
 
     if (action === 'delete-vendor') {
       if (!confirm('確定要刪除此廠商嗎？')) return;
-      STATE = await callScript('deleteVendor', { vendorId: id });
+      STATE = await callScript('deleteVendor', { vendorId: id, projectId: CURRENT_PROJECT_ID });
       render();
     }
 
@@ -256,7 +310,7 @@ document.getElementById('btnAdvanceStatus').addEventListener('click', async () =
   if (!next) return;
   if (!confirm(`確定要把專案狀態推進至「${next}」嗎？`)) return;
   try {
-    STATE = await callScript('updateProject', { status: next });
+    STATE = await callScript('updateProject', { status: next, projectId: CURRENT_PROJECT_ID });
     render();
   } catch (err) {
     alert('操作失敗：' + err.message);
@@ -270,9 +324,9 @@ document.getElementById('btnDeleteProject').addEventListener('click', async () =
     return;
   }
   try {
-    STATE = await callScript('deleteProject');
-    render();
-    alert('專案資料已清除。');
+    await callScript('deleteProject', { projectId: CURRENT_PROJECT_ID });
+    alert('專案資料已刪除。');
+    showListView();
   } catch (err) {
     alert('刪除失敗：' + err.message);
   }
@@ -379,6 +433,7 @@ function openClientStageForm() {
   `, '#clientStageForm', async (form) => {
     const fd = new FormData(form);
     STATE = await callScript('addClientStage', {
+      projectId: CURRENT_PROJECT_ID,
       stageName: fd.get('stageName'), amount: fd.get('amount'), expectedDate: fd.get('expectedDate')
     });
     render();
@@ -400,6 +455,7 @@ function openVendorForm() {
   `, '#vendorForm', async (form) => {
     const fd = new FormData(form);
     STATE = await callScript('addVendor', {
+      projectId: CURRENT_PROJECT_ID,
       vendorName: fd.get('vendorName'), category: fd.get('category'), contractAmount: fd.get('contractAmount')
     });
     render();
@@ -422,13 +478,42 @@ function openVendorPaymentForm(vendorId) {
   `, '#vendorPaymentForm', async (form) => {
     const fd = new FormData(form);
     STATE = await callScript('addVendorPayment', {
+      projectId: CURRENT_PROJECT_ID,
       vendorId, amount: fd.get('amount'), date: fd.get('date'), note: fd.get('note')
     });
     render();
   });
 }
 
-// ===== 連接設定（Apps Script 網址 + 第一次建立專案）=====
+// ===== 新增專案（在專案列表頁觸發）=====
+function openNewProjectForm() {
+  openFormModal(`
+    <h3 class="form-title">新增專案</h3>
+    <form id="newProjectForm">
+      <div class="form-field"><label>業主姓名</label><input name="clientName" required placeholder="例：李先生"></div>
+      <div class="form-field"><label>專案名稱</label><input name="projectName" required placeholder="例：高雄-自由路 李宅"></div>
+      <div class="form-field"><label>業主報價總額</label><input name="totalRevenue" type="number" min="0" required></div>
+      <div class="form-field"><label>預計完工日</label><input name="endDate" type="date"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn--ghost" data-form-cancel>取消</button>
+        <button type="submit" class="btn btn--primary">建立專案</button>
+      </div>
+    </form>
+  `, '#newProjectForm', async (form) => {
+    const fd = new FormData(form);
+    const result = await callScript('createProject', {
+      clientName: fd.get('clientName'),
+      projectName: fd.get('projectName'),
+      totalRevenue: fd.get('totalRevenue'),
+      endDate: fd.get('endDate')
+    });
+    PROJECT_LIST = result.projects || [];
+    renderProjectGrid();
+    if (result.projectId) openProject(result.projectId);
+  });
+}
+
+// ===== 連接設定（僅設定 Apps Script 網址）=====
 function openSettingsForm() {
   openFormModal(`
     <h3 class="form-title">連接設定</h3>
@@ -437,11 +522,6 @@ function openSettingsForm() {
         <label>Google Apps Script 網址（/exec 結尾）</label>
         <input name="scriptUrl" required placeholder="https://script.google.com/macros/s/xxxx/exec" value="${SCRIPT_URL}">
       </div>
-      <p class="panel-hint" style="margin-bottom:14px;">若 Sheet 裡還沒有專案資料，可一併填寫以下欄位建立第一筆專案（已有資料的話可留空）。</p>
-      <div class="form-field"><label>業主姓名</label><input name="clientName" placeholder="例：李先生"></div>
-      <div class="form-field"><label>專案名稱</label><input name="projectName" placeholder="例：高雄-自由路 李宅"></div>
-      <div class="form-field"><label>業主報價總額</label><input name="totalRevenue" type="number" min="0" value="${STATE?.totalRevenue || ''}"></div>
-      <div class="form-field"><label>業主追加（含利潤）</label><input name="totalAddOns" type="number" min="0" value="${STATE?.totalAddOns || ''}" placeholder="若無追加項目可留空"></div>
       <div class="modal-actions">
         <button type="button" class="btn btn--ghost" data-form-cancel>取消</button>
         <button type="submit" class="btn btn--primary">儲存並連接</button>
@@ -451,38 +531,19 @@ function openSettingsForm() {
     const fd = new FormData(form);
     SCRIPT_URL = fd.get('scriptUrl').trim();
     localStorage.setItem('jy_script_url', SCRIPT_URL);
-
-    if (fd.get('projectName') || fd.get('clientName')) {
-      STATE = await callScript('initProject', {
-        clientName: fd.get('clientName') || '',
-        projectName: fd.get('projectName') || '',
-        totalRevenue: fd.get('totalRevenue') || 0
-      });
-      if (fd.get('totalAddOns')) {
-        STATE = await callScript('updateProject', { totalAddOns: fd.get('totalAddOns') });
-      }
-    } else {
-      STATE = await callScript('getData');
-      const updates = {};
-      if (fd.get('totalRevenue')) updates.totalRevenue = fd.get('totalRevenue');
-      if (fd.get('totalAddOns')) updates.totalAddOns = fd.get('totalAddOns');
-      if (Object.keys(updates).length) {
-        STATE = await callScript('updateProject', updates);
-      }
-    }
-    hideBanner();
-    render();
+    showListView();
   });
 }
 
-// ===== Export / Import =====
+// ===== Export / Import（僅匯出/匯入「目前開啟中的單一專案」）=====
 document.getElementById('btnExport').addEventListener('click', async () => {
+  if (!CURRENT_PROJECT_ID) { alert('請先點開一個專案再匯出。'); return; }
   try {
-    const data = await callScript('exportData');
+    const data = await callScript('exportData', { projectId: CURRENT_PROJECT_ID });
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = 'project-backup.json';
+    a.download = (data.projectName || 'project') + '-backup.json';
     a.click();
   } catch (err) {
     alert('匯出失敗：' + err.message);
@@ -492,10 +553,12 @@ document.getElementById('btnExport').addEventListener('click', async () => {
 document.getElementById('importFile').addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (!file) return;
+  if (!CURRENT_PROJECT_ID) { alert('請先點開一個專案，匯入會覆蓋「目前這個專案」的資料。'); e.target.value = ''; return; }
   const text = await file.text();
   try {
-    JSON.parse(text); // 驗證格式
-    STATE = await callScript('importData', { payload: encodeURIComponent(text) });
+    const parsed = JSON.parse(text);
+    parsed.projectId = CURRENT_PROJECT_ID; // 匯入一律覆蓋「目前開啟的專案」，不會影響其他專案
+    STATE = await callScript('importData', { payload: encodeURIComponent(JSON.stringify(parsed)), projectId: CURRENT_PROJECT_ID });
     render();
     alert('資料匯入成功！');
   } catch (err) {
@@ -512,4 +575,5 @@ document.getElementById('formOverlay').addEventListener('click', (e) => {
   if (e.target.id === 'formOverlay') closeFormModal();
 });
 
-loadProject();
+// ===== 啟動 =====
+showListView();
